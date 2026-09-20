@@ -19,16 +19,14 @@ import { generateCode } from './utils/code-generator.js';
 /**
  * Service Users.
  *
- * Contient la logique métier :
- *  - génération de code unique
- *  - règles de cohérence (MEMBRE ⇒ personId, pas de doublon Person)
- *  - mapping vers la réponse API
+ *    (liste, détail, création) — c'est nécessaire pour
+ *
  */
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
 
-  constructor(private readonly repo: UsersRepository) { }
+  constructor(private readonly repo: UsersRepository) {}
 
   // ------------------------------------------------------------------
   // CREATE
@@ -51,7 +49,6 @@ export class UsersService {
       }
     }
 
-    // 3) Génération d'un code unique (retry jusqu'à 5 fois en cas de collision)
     const code = await this.generateUniqueCode();
 
     // 4) Création
@@ -63,7 +60,10 @@ export class UsersService {
         : undefined,
     });
 
-    this.logger.log(`User créé : ${user.id} (code ${user.code})`);
+    // 🔒 Log masqué : on ne journalise JAMAIS le code en clair
+    this.logger.log(`User créé : ${user.id} (${user.role})`);
+
+    // ✅ Le code est renvoyé (mapper standard) — admin seulement
     return UserMapper.toResponse(user);
   }
 
@@ -158,10 +158,6 @@ export class UsersService {
   // ------------------------------------------------------------------
   // HELPERS
   // ------------------------------------------------------------------
-  /**
-   * Génère un code unique. En cas de collision (ultra-rare),
-   * on retente jusqu'à 5 fois puis on abandonne.
-   */
   private async generateUniqueCode(): Promise<string> {
     for (let i = 0; i < 5; i++) {
       const code = generateCode();

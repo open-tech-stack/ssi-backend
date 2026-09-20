@@ -2,30 +2,34 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
+import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
 import type { AppConfig } from '../../../config/configuration.js';
+import { ACCESS_COOKIE } from '../utils/auth-cookies.js';
 import type { JwtPayload } from '../types/jwt-payload.type.js';
 
 /**
- * Stratégie JWT — vérifie l'access token et injecte le payload dans req.user.
+ * Extrait le JWT depuis :
+ *  1. Le cookie httpOnly `ssi.accessToken` (cas normal navigateur)
+ *  2. Le header `Authorization: Bearer ...` (fallback Swagger / tests)
  */
+function jwtFromCookieOrHeader(req: Request): string | null {
+  const fromCookie = req?.cookies?.[ACCESS_COOKIE];
+  if (fromCookie) return fromCookie;
+  return ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(config: ConfigService<AppConfig, true>) {
-    const secret = config.get('jwt.accessSecret', { infer: true });
-
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: jwtFromCookieOrHeader,
       ignoreExpiration: false,
-      secretOrKey: secret,
+      secretOrKey: config.get('jwt.accessSecret', { infer: true }),
     });
   }
 
-  /**
-   * Retourne le contenu qui sera injecté dans `request.user`.
-   * On rejette les refresh tokens (ils ne doivent pas servir d'access).
-   */
   async validate(payload: JwtPayload): Promise<JwtPayload> {
     if (payload.type !== 'access') {
       throw new UnauthorizedException('Type de token invalide.');

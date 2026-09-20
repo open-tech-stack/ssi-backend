@@ -9,19 +9,22 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 import type { AppConfig } from '../../config/configuration.js';
-import type { User } from '../../generated/prisma/client.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
-import { UsersRepository, UserWithPerson } from '../users/repositories/users.repository.js';
+import {
+  UsersRepository,
+  UserWithPerson,
+} from '../users/repositories/users.repository.js';
 
 import type { JwtPayload } from './types/jwt-payload.type.js';
 
 /**
  * Service Auth.
  *
- * - login(code) : vérifie le code, génère access + refresh tokens,
- *                 stocke le hash du refresh dans User.refreshTokenHash.
- * - refresh(refreshToken) : vérifie le refresh, en génère un nouveau couple.
- * - logout(userId) : efface le hash.
+ *
+ *    Raison : /auth/login est public, /auth/me est appelé par le user
+ *    DevTools / logs / XSS alors qu'il sert de mot de passe.
+ *
+ *    En revanche, les endpoints /users/* (admin uniquement) PEUVENT
  */
 @Injectable()
 export class AuthService {
@@ -40,7 +43,6 @@ export class AuthService {
   async login(code: string) {
     const user = await this.usersRepo.findByCode(code);
     if (!user) {
-      // On ne dit JAMAIS si le code existe ou pas
       throw new UnauthorizedException('Code invalide.');
     }
 
@@ -81,8 +83,7 @@ export class AuthService {
     }
 
     // 4) Nouveaux tokens (rotation)
-    const tokens = await this.issueTokens(user);
-    return tokens;
+    return this.issueTokens(user);
   }
 
   // ------------------------------------------------------------------
@@ -101,7 +102,6 @@ export class AuthService {
     if (!user) throw new UnauthorizedException();
     return {
       id: user.id,
-      code: user.code,
       role: user.role,
       personId: user.personId,
       fullName: user.person?.fullName ?? null,
@@ -143,10 +143,9 @@ export class AuthService {
       refreshToken,
       user: {
         id: user.id,
-        code: user.code,
         role: user.role,
         personId: user.personId,
-        fullName: user.person?.fullName ?? null, 
+        fullName: user.person?.fullName ?? null,
       },
     };
   }
