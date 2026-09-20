@@ -55,6 +55,8 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('docs', app, document, {
+      useGlobalPrefix: false,
+      jsonDocumentUrl: 'docs-json',
       swaggerOptions: {
         persistAuthorization: true,
         tagsSorter: 'alpha',
