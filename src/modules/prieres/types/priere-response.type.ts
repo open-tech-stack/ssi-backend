@@ -1,0 +1,14 @@
+// src/modules/prieres/types/priere-response.type.ts
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class PriereResponse {
+  @ApiProperty() id!: string;
+  @ApiProperty() title!: string;
+  @ApiPropertyOptional({ nullable: true }) date?: string | null;
+  @ApiPropertyOptional({ nullable: true }) location?: string | null;
+  @ApiPropertyOptional({ nullable: true }) detail?: string | null;
+  @ApiProperty() priority!: string;
+  @ApiProperty() notification!: boolean;
+  @ApiProperty() createdAt!: string;
+  @ApiProperty() updatedAt!: string;
+}

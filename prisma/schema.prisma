@@ -1,0 +1,448 @@
+// prisma/schema.prisma
+// ==================================================================
+// SSI Backend — Schéma Prisma
+// ==================================================================
+// Convention :
+//   - Modèles en PascalCase
+//   - Champs en camelCase
+//   - Tables en snake_case (via @@map)
+//   - Soft delete via deletedAt sur les entités principales
+// ==================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"  
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================================================================
+// AUTH & USERS
+// ==================================================================
+
+enum UserRole {
+  ADMIN
+  MEMBRE
+}
+
+/// Un compte utilisateur.
+/// - ADMIN : accès complet à l'admin
+/// - MEMBRE : accès en lecture seule à l'app mobile
+/// Le code à 10 caractères est généré automatiquement à la création.
+model User {
+  id       String   @id @default(cuid())
+  code     String   @unique
+  role     UserRole @default(MEMBRE)
+  expoPushToken String?
+
+  // Un MEMBRE est obligatoirement lié à une Person.
+  // Un ADMIN peut ne pas avoir de Person liée.
+  personId String?  @unique
+  person   Person?  @relation(fields: [personId], references: [id], onDelete: SetNull)
+
+  // Hash du refresh token actif (null = déconnecté / pas de session)
+  refreshTokenHash String?
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+// ==================================================================
+// BASE : Person & Group
+// ==================================================================
+
+/// Toute personne référencée dans l'église (membre ou non).
+/// Un formateur, un conférencier, un marié… = une Person.
+/// Toutes les Person ne sont PAS des Users.
+model Person {
+  id        String  @id @default(cuid())
+  firstName String
+  lastName  String?
+  fullName  String
+  role      String? // Rôle habituel : Diacre, Pasteur, Choriste…
+  avatar    String?
+
+  // Relation 1-1 avec User (inverse)
+  user User?
+
+  // Relations avec les sections de programme
+  programmeSections ProgrammeSectionPerson[]
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fullName])
+  @@index([deletedAt])
+  @@map("people")
+}
+
+/// Un groupe (ex : Groupe musical, Équipe de protocole).
+/// Utilisable dans les sections de programme à la place de Person.
+model Group {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  // Relations avec les sections de programme
+  programmeSections ProgrammeSection[]
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([deletedAt])
+  @@map("groups")
+}
+
+// ==================================================================
+// PROGRAMMES
+// ==================================================================
+
+enum ProgrammeKind {
+  CULTE_DIMANCHE
+  PRIERE_VENDREDI
+}
+
+enum Priority {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+enum InfoStatus {
+  A_VENIR
+  EN_COURS
+  TERMINE
+  ANNULE
+  EXPIRE
+}
+
+enum ProgrammeSectionKey {
+  ACCUEIL
+  ANIMATION
+  LOUANGE_ADORATION
+  PREDICATION
+  INTERPRETATION
+  PARKING
+  LIBRE
+}
+
+/// Un programme de culte ou de prière.
+model Programme {
+  id       String        @id @default(cuid())
+  kind     ProgrammeKind
+  title    String
+  summary  String
+  content  String?
+  priority Priority      @default(NORMAL)
+  status   InfoStatus    @default(A_VENIR)
+  location String?
+
+  // Sainte-Cène (uniquement pour CULTE_DIMANCHE)
+  hasHolyCommunion      Boolean?
+  holyCommunionMessage  String?
+
+  notes String?
+
+  // Dates
+  publishedAt DateTime?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  expiresAt   DateTime?
+
+  notification Boolean @default(false)
+
+  // Sections ordonnées
+  sections ProgrammeSection[]
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+  @@index([status])
+  @@index([startsAt])
+  @@index([deletedAt])
+  @@map("programmes")
+}
+
+/// Une section de programme (ex : Accueil, Animation, Prédication).
+/// Peut être portée par :
+///  - des Person (via ProgrammeSectionPerson)
+///  - un Group (via groupId)
+///  - une valeur simple (via value)
+model ProgrammeSection {
+  id    String              @id @default(cuid())
+  key   ProgrammeSectionKey
+  label String
+  order Int                 @default(0)
+  value String?
+
+  programmeId String
+  programme   Programme @relation(fields: [programmeId], references: [id], onDelete: Cascade)
+
+  // Option A : plusieurs personnes
+  persons ProgrammeSectionPerson[]
+
+  // Option B : un groupe
+  groupId String?
+  group   Group?  @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([programmeId])
+  @@map("programme_sections")
+}
+
+/// Table de jointure entre ProgrammeSection et Person (N-N).
+model ProgrammeSectionPerson {
+  sectionId String
+  personId  String
+
+  section ProgrammeSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  person  Person           @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([sectionId, personId])
+  @@index([personId])
+  @@map("programme_section_persons")
+}
+
+// ==================================================================
+// ÉVÉNEMENTS
+// ==================================================================
+
+enum EvenementKind {
+  MARIAGE
+  CAMP
+  SORTIE
+  CONFERENCE
+  FORMATION
+  ACTION_DE_GRACE
+  JOURNEE
+  AUTRE
+}
+
+enum PublicCible {
+  ENFANTS_ET_ADOS
+  ADOS
+  FEMMES_AFEC
+  JEUNESSE
+  ENFANTS_DE_PASTEURS
+  FEMMES
+  HOMMES_MARIES
+  PERSONNES_AGEES
+  CONSEIL
+  PASTEUR
+  VEUVES_ET_ORPHELINS
+  AUTRE
+}
+
+/// Un événement. Un seul modèle avec tous les champs optionnels.
+/// Les champs non-pertinents pour un type restent NULL.
+model Evenement {
+  id       String        @id @default(cuid())
+  kind     EvenementKind
+  title    String
+  summary  String
+  detail   String?
+  priority Priority      @default(NORMAL)
+  status   InfoStatus    @default(A_VENIR)
+
+  location String?
+
+  // Dates
+  publishedAt DateTime?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  expiresAt   DateTime?
+
+  notification Boolean @default(false)
+
+  // ----- Champs MARIAGE -----
+  brideName     String?
+  groomName     String?
+  townHallTime  String?
+  townHallPlace String?
+  ceremonyTime  String?
+  ceremonyPlace String?
+  receptionPlace String?
+
+  // ----- Champs CAMP / SORTIE / JOURNEE -----
+  audience      PublicCible?
+  audienceOther String?
+  theme         String?
+
+  // ----- Champs CONFERENCE -----
+  speaker String?
+
+  // ----- Champs FORMATION -----
+  trainer String?
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+  @@index([startsAt])
+  @@index([deletedAt])
+  @@map("evenements")
+}
+
+// ==================================================================
+// INFOS
+// ==================================================================
+
+/// Une info = titre + summary + detail. Rien de plus.
+/// Pas de catégorie, pas de statut. L'admin supprime manuellement.
+model Info {
+  id      String  @id @default(cuid())
+  title   String
+  summary String
+  detail  String?
+
+  priority Priority @default(NORMAL)
+
+  /// Faut-il envoyer une notification push ?
+  notification Boolean @default(false)
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@map("infos")
+}
+
+// ==================================================================
+// PRIÈRES
+// ==================================================================
+
+/// Une prière. Tous les champs optionnels sauf le titre.
+model Priere {
+  id       String  @id @default(cuid())
+  title    String
+  date     DateTime?
+  location String?
+  detail   String?
+
+  priority Priority @default(NORMAL)
+
+  /// Faut-il envoyer une notification push ?
+  notification Boolean @default(false)
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([deletedAt])
+  @@index([date])
+  @@map("prieres")
+}
+
+
+// ==================================================================
+// RAPPELS
+// ==================================================================
+
+/// Un rappel = titre + liste d'éléments à retenir + détail libre.
+model Rappel {
+  id     String  @id @default(cuid())
+  title  String
+  detail String?
+
+  priority Priority @default(NORMAL)
+
+  /// Faut-il envoyer une notification push ?
+  notification Boolean @default(false)
+
+  // Liste d'éléments
+  elements RappelElement[]
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([deletedAt])
+  @@index([createdAt])
+  @@map("rappels")
+}
+
+/// Un élément d'un rappel (ex : "Apporter sa Bible").
+model RappelElement {
+  id       String @id @default(cuid())
+  text     String
+  order    Int    @default(0)
+
+  rappelId String
+  rappel   Rappel @relation(fields: [rappelId], references: [id], onDelete: Cascade)
+
+  @@index([rappelId])
+  @@map("rappel_elements")
+}
+
+// ==================================================================
+// NOTIFICATIONS
+// ==================================================================
+
+/// Type de notification — pilote l'icône/couleur côté mobile.
+enum NotificationType {
+  PROGRAMME
+  EVENEMENT
+  INFO
+  PRIERE
+  RAPPEL
+  GENERIC
+}
+
+/// Une notification collective envoyée à tous les membres.
+/// Le flag `read` est global (MVP) — toutes les notifications
+/// sont marquées lues en bloc par l'admin qui les consulte.
+model Notification {
+  id      String           @id @default(cuid())
+  type    NotificationType @default(GENERIC)
+  title   String
+  message String
+  /// Deep link mobile, ex : "/programmes/clx123"
+  linkTo  String?
+  /// Référence à l'entité source (optionnel)
+  sourceId String?
+  /// Notification lue ou non (globale MVP)
+  read    Boolean          @default(false)
+  /// Envoyée aux push ? (utilisé plus tard avec Expo)
+  pushed  Boolean          @default(false)
+
+  // Soft delete
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([read])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("notifications")
+}
