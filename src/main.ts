@@ -1,5 +1,4 @@
-import { dirname } from 'node:path';
-import { createRequire } from 'node:module';
+import { join } from 'node:path';
 
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -9,8 +8,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
 import type { AppConfig } from './config/configuration.js';
 
-const require = createRequire(import.meta.url);
-const swaggerUiPath = dirname(require.resolve('swagger-ui-dist'));
+const swaggerUiPath = join(process.cwd(), 'dist/swagger-ui');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
