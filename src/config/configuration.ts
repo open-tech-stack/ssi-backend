@@ -29,7 +29,7 @@ export interface AppConfig {
 export default (): AppConfig => ({
   app: {
     env: (process.env.NODE_ENV as AppConfig['app']['env']) ?? 'development',
-    port: parseInt(process.env.PORT ?? '3000', 10),
+    port: parseInt(process.env.PORT ?? '5000', 10),
     swaggerEnabled: process.env.SWAGGER_ENABLED === 'true',
   },
   database: {
