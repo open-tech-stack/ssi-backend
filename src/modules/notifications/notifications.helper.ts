@@ -8,6 +8,16 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { NotificationsService } from './notifications.service.js';
 
 /**
+ * ⚠️ IMPORTANT : cet ID doit être IDENTIQUE à celui utilisé côté mobile
+ * dans `src/services/push.service.ts` (ANDROID_CHANNEL_ID).
+ *
+ * Si tu changes la config du canal (sound, vibration…), tu DOIS changer
+ * cet ID ET l'ID côté mobile, puis faire réinstaller l'app aux users.
+ * Les canaux Android sont immuables une fois créés.
+ */
+const ANDROID_CHANNEL_ID = 'ssi-default-v2';
+
+/**
  * Payload interne de création d'une notification.
  */
 interface CreateNotificationPayload {
@@ -18,15 +28,6 @@ interface CreateNotificationPayload {
   sourceId: string;
 }
 
-/**
- * Helper pour créer des notifications depuis d'autres services
- * (Programmes, Événements, Infos, Prières, Rappels) sans coupler
- * les modules entre eux.
- *
- * ⚠️ Toutes les méthodes sont "best-effort" : elles ne throw JAMAIS.
- * Une erreur de notification ne doit pas faire échouer la création
- * de l'entité métier.
- */
 @Injectable()
 export class NotificationsHelper {
   private readonly logger = new Logger(NotificationsHelper.name);
@@ -135,6 +136,11 @@ export class NotificationsHelper {
       });
 
       // 3) Construit les messages Expo
+      //
+      //    ⚠️ Les 3 propriétés CRITIQUES pour que la notif sonne/vibre :
+      //       - sound: 'default'       → iOS joue le son
+      //       - priority: 'high'       → iOS réveille l'appareil + joue le son
+      //       - channelId: '<id>'      → Android utilise le canal avec son/vibration
       const messages = users
         .filter(
           (u): u is { expoPushToken: string } =>
@@ -142,10 +148,18 @@ export class NotificationsHelper {
         )
         .map((u) => ({
           to: u.expoPushToken,
-          sound: 'default' as const,
+
           title: payload.title,
           body: payload.message,
-          data: { linkTo: payload.linkTo, type: payload.type },
+
+          sound: 'default' as const,
+          priority: 'high' as const,
+          channelId: ANDROID_CHANNEL_ID,
+
+          data: {
+            linkTo: payload.linkTo,
+            type: payload.type,
+          },
         }));
 
       if (messages.length === 0) return;
@@ -153,7 +167,18 @@ export class NotificationsHelper {
       // 4) Envoi en chunks
       const chunks = this.expo.chunkPushNotifications(messages);
       for (const chunk of chunks) {
-        await this.expo.sendPushNotificationsAsync(chunk);
+        const tickets = await this.expo.sendPushNotificationsAsync(chunk);
+
+        // Log les erreurs éventuelles (token invalide, etc.)
+        tickets.forEach((ticket, i) => {
+          if (ticket.status === 'error') {
+            this.logger.warn(
+              `Push error [${chunk[i]?.to ?? '?'}]: ${ticket.message} (${
+                ticket.details?.error ?? 'unknown'
+              })`,
+            );
+          }
+        });
       }
     } catch (err) {
       this.logger.warn(
