@@ -18,6 +18,13 @@ import { NotificationsService } from './notifications.service.js';
 const ANDROID_CHANNEL_ID = 'ssi-default-v2';
 
 /**
+ * Image affichée dans la notification (grande icône à droite).
+ * ⚠️ Doit être une URL HTTPS publique (CDN, GitHub raw, etc.).
+ */
+const NOTIFICATION_IMAGE_URL =
+  'https://raw.githubusercontent.com/open-tech-stack/public-images/main/illustration/00001.png';
+
+/**
  * Payload interne de création d'une notification.
  */
 interface CreateNotificationPayload {
@@ -116,7 +123,7 @@ export class NotificationsHelper {
   }
 
   // ------------------------------------------------------------------
-  // INTERNAL — best-effort
+  // INTERNAL — best-effort (ne throw JAMAIS)
   // ------------------------------------------------------------------
   private async safeCreate(payload: CreateNotificationPayload): Promise<void> {
     try {
@@ -137,10 +144,14 @@ export class NotificationsHelper {
 
       // 3) Construit les messages Expo
       //
-      //    ⚠️ Les 3 propriétés CRITIQUES pour que la notif sonne/vibre :
+      //    ⚠️ Propriétés CRITIQUES pour son/vibration :
       //       - sound: 'default'       → iOS joue le son
-      //       - priority: 'high'       → iOS réveille l'appareil + joue le son
-      //       - channelId: '<id>'      → Android utilise le canal avec son/vibration
+      //       - priority: 'high'       → iOS réveille l'appareil
+      //       - channelId: '<id>'      → Android utilise le canal
+      //
+      //    🎨 Propriétés de design :
+      //       - richContent.image      → image à droite de la notif (Android)
+      //       - autoDismiss: false     → la notif reste après un tap
       const messages = users
         .filter(
           (u): u is { expoPushToken: string } =>
@@ -149,13 +160,24 @@ export class NotificationsHelper {
         .map((u) => ({
           to: u.expoPushToken,
 
+          // Contenu
           title: payload.title,
           body: payload.message,
 
+          // Son & vibration
           sound: 'default' as const,
           priority: 'high' as const,
           channelId: ANDROID_CHANNEL_ID,
 
+          // Comportement
+          autoDismiss: false,
+
+          // 🖼️ Image dans la notif (grande icône à droite)
+          richContent: {
+            image: NOTIFICATION_IMAGE_URL,
+          },
+
+          // Deep link + type
           data: {
             linkTo: payload.linkTo,
             type: payload.type,

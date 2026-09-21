@@ -111,7 +111,12 @@ export type RappelElement = Prisma.RappelElementModel
 /**
  * Model Notification
  * Une notification collective envoyée à tous les membres.
- * Le flag `read` est global (MVP) — toutes les notifications
- * sont marquées lues en bloc par l'admin qui les consulte.
+ * L'état "lu" est stocké séparément dans NotificationRead (par user).
  */
 export type Notification = Prisma.NotificationModel
+/**
+ * Model NotificationRead
+ * Marque qu'un utilisateur a lu une notification.
+ * Table de jointure N-N entre User et Notification.
+ */
+export type NotificationRead = Prisma.NotificationReadModel

@@ -62,7 +62,8 @@ export const ModelName = {
   Priere: 'Priere',
   Rappel: 'Rappel',
   RappelElement: 'RappelElement',
-  Notification: 'Notification'
+  Notification: 'Notification',
+  NotificationRead: 'NotificationRead'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -265,7 +266,6 @@ export const NotificationScalarFieldEnum = {
   message: 'message',
   linkTo: 'linkTo',
   sourceId: 'sourceId',
-  read: 'read',
   pushed: 'pushed',
   deletedAt: 'deletedAt',
   createdAt: 'createdAt',
@@ -273,6 +273,15 @@ export const NotificationScalarFieldEnum = {
 } as const
 
 export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[keyof typeof NotificationScalarFieldEnum]
+
+
+export const NotificationReadScalarFieldEnum = {
+  userId: 'userId',
+  notificationId: 'notificationId',
+  readAt: 'readAt'
+} as const
+
+export type NotificationReadScalarFieldEnum = (typeof NotificationReadScalarFieldEnum)[keyof typeof NotificationReadScalarFieldEnum]
 
 
 export const SortOrder = {

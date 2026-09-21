@@ -3,8 +3,15 @@ import type { Notification } from '../../../generated/prisma/client.js';
 
 import type { NotificationResponse } from '../types/notification-response.type.js';
 
+/**
+ * Le mapper reçoit soit une Notification brute (avec `read: false`
+ * par défaut), soit une Notification enrichie avec `read` calculé
+ * pour un user donné.
+ */
+type NotificationWithRead = Notification & { read: boolean };
+
 export class NotificationMapper {
-  static toResponse(n: Notification): NotificationResponse {
+  static toResponse(n: NotificationWithRead): NotificationResponse {
     return {
       id: n.id,
       type: n.type,
@@ -19,7 +26,7 @@ export class NotificationMapper {
     };
   }
 
-  static toResponseList(items: Notification[]): NotificationResponse[] {
+  static toResponseList(items: NotificationWithRead[]): NotificationResponse[] {
     return items.map((n) => NotificationMapper.toResponse(n));
   }
 }

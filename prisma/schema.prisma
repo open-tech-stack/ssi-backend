@@ -36,7 +36,7 @@ model User {
   code     String   @unique
   role     UserRole @default(MEMBRE)
   expoPushToken String?
-
+  notificationReads NotificationRead[]
   // Un MEMBRE est obligatoirement lié à une Person.
   // Un ADMIN peut ne pas avoir de Person liée.
   personId String?  @unique
@@ -419,8 +419,7 @@ enum NotificationType {
 }
 
 /// Une notification collective envoyée à tous les membres.
-/// Le flag `read` est global (MVP) — toutes les notifications
-/// sont marquées lues en bloc par l'admin qui les consulte.
+/// L'état "lu" est stocké séparément dans NotificationRead (par user).
 model Notification {
   id      String           @id @default(cuid())
   type    NotificationType @default(GENERIC)
@@ -430,10 +429,10 @@ model Notification {
   linkTo  String?
   /// Référence à l'entité source (optionnel)
   sourceId String?
-  /// Notification lue ou non (globale MVP)
-  read    Boolean          @default(false)
-  /// Envoyée aux push ? (utilisé plus tard avec Expo)
   pushed  Boolean          @default(false)
+
+  /// Utilisateurs ayant lu cette notification (N-N)
+  reads   NotificationRead[]
 
   // Soft delete
   deletedAt DateTime?
@@ -441,8 +440,24 @@ model Notification {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([read])
   @@index([createdAt])
   @@index([deletedAt])
   @@map("notifications")
+}
+
+/// Marque qu'un utilisateur a lu une notification.
+/// Table de jointure N-N entre User et Notification.
+model NotificationRead {
+  userId         String
+  notificationId String
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  readAt DateTime @default(now())
+
+  @@id([userId, notificationId])
+  @@index([userId])
+  @@index([notificationId])
+  @@map("notification_reads")
 }

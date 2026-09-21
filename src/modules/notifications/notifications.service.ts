@@ -27,16 +27,18 @@ export class NotificationsService {
     this.logger.log(
       `Notification créée : ${notification.id} (${notification.type})`,
     );
-    return NotificationMapper.toResponse(notification);
+    // Le read est calculé par user → on renvoie false par défaut
+    return NotificationMapper.toResponse({ ...notification, read: false });
   }
 
   // ------------------------------------------------------------------
   // READ
   // ------------------------------------------------------------------
-  async findAll(query: QueryNotificationsDto) {
+  async findAllForUser(userId: string, query: QueryNotificationsDto) {
     const skip = (query.page - 1) * query.pageSize;
 
-    const { items, total } = await this.repo.findMany({
+    const { items, total } = await this.repo.findManyForUser({
+      userId,
       type: query.type,
       read: query.read,
       skip,
@@ -54,31 +56,35 @@ export class NotificationsService {
     };
   }
 
-  async findOne(id: string) {
+  async findOneForUser(userId: string, id: string) {
     const notification = await this.repo.findById(id);
-    if (!notification)
+    if (!notification) {
       throw new NotFoundException(`Notification ${id} introuvable.`);
-    return NotificationMapper.toResponse(notification);
+    }
+    // Note : on pourrait ajouter `read` ici, mais l'usage principal
+    // est de lister. Garde simple.
+    return NotificationMapper.toResponse({ ...notification, read: false });
   }
 
-  async countUnread() {
-    const count = await this.repo.countUnread();
+  async countUnreadForUser(userId: string) {
+    const count = await this.repo.countUnreadForUser(userId);
     return { count };
   }
 
   // ------------------------------------------------------------------
-  // MARK READ
+  // MARK READ (par user)
   // ------------------------------------------------------------------
-  async markRead(id: string) {
+  async markReadForUser(userId: string, id: string) {
     const existing = await this.repo.findById(id);
-    if (!existing)
+    if (!existing) {
       throw new NotFoundException(`Notification ${id} introuvable.`);
-    const updated = await this.repo.markRead(id);
-    return NotificationMapper.toResponse(updated);
+    }
+    await this.repo.markReadForUser(userId, id);
+    return { success: true };
   }
 
-  async markAllRead() {
-    const count = await this.repo.markAllRead();
+  async markAllReadForUser(userId: string) {
+    const count = await this.repo.markAllReadForUser(userId);
     return { success: true, count };
   }
 
@@ -87,14 +93,15 @@ export class NotificationsService {
   // ------------------------------------------------------------------
   async remove(id: string) {
     const existing = await this.repo.findById(id);
-    if (!existing)
+    if (!existing) {
       throw new NotFoundException(`Notification ${id} introuvable.`);
+    }
     await this.repo.softDelete(id);
     return { success: true };
   }
 
-  async removeAllRead() {
-    const count = await this.repo.softDeleteAllRead();
+  async removeAllReadForUser(userId: string) {
+    const count = await this.repo.softDeleteAllReadForUser(userId);
     return { success: true, count };
   }
 }

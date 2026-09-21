@@ -13,8 +13,10 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { UserRole } from '../../generated/prisma/client.js';
+import type { JwtPayload } from '../auth/types/jwt-payload.type.js';
 
 import { CreateNotificationDto, QueryNotificationsDto } from './dto/index.js';
 import { NotificationsService } from './notifications.service.js';
@@ -26,41 +28,44 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   // ------------------------------------------------------------------
-  // READ (ADMIN + MEMBRE)
+  // READ (ADMIN + MEMBRE) — personnalisé par user
   // ------------------------------------------------------------------
 
   @Get()
-  @ApiOperation({ summary: 'Lister les notifications' })
-  findAll(@Query() query: QueryNotificationsDto) {
-    return this.notificationsService.findAll(query);
+  @ApiOperation({ summary: 'Lister les notifications (état lu par user)' })
+  findAll(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: QueryNotificationsDto,
+  ) {
+    return this.notificationsService.findAllForUser(user.sub, query);
   }
 
   @Get('unread-count')
-  @ApiOperation({ summary: 'Nombre de notifications non lues' })
-  countUnread() {
-    return this.notificationsService.countUnread();
+  @ApiOperation({ summary: 'Nombre de notifications non lues (par user)' })
+  countUnread(@CurrentUser() user: JwtPayload) {
+    return this.notificationsService.countUnreadForUser(user.sub);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Voir une notification' })
-  findOne(@Param('id') id: string) {
-    return this.notificationsService.findOne(id);
+  findOne(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.notificationsService.findOneForUser(user.sub, id);
   }
 
   // ------------------------------------------------------------------
-  // MARK READ
+  // MARK READ — par user
   // ------------------------------------------------------------------
 
   @Patch(':id/read')
-  @ApiOperation({ summary: 'Marquer une notification comme lue' })
-  markRead(@Param('id') id: string) {
-    return this.notificationsService.markRead(id);
+  @ApiOperation({ summary: 'Marquer une notification comme lue (par user)' })
+  markRead(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.notificationsService.markReadForUser(user.sub, id);
   }
 
   @Patch('read-all')
-  @ApiOperation({ summary: 'Marquer toutes les notifications comme lues' })
-  markAllRead() {
-    return this.notificationsService.markAllRead();
+  @ApiOperation({ summary: 'Marquer toutes les notifications comme lues (par user)' })
+  markAllRead(@CurrentUser() user: JwtPayload) {
+    return this.notificationsService.markAllReadForUser(user.sub);
   }
 
   // ------------------------------------------------------------------
@@ -75,15 +80,15 @@ export class NotificationsController {
   }
 
   // ------------------------------------------------------------------
-  // DELETE (ADMIN)
+  // DELETE
   // ------------------------------------------------------------------
 
   @Delete('read')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Supprimer toutes les notifications lues (ADMIN)' })
-  removeAllRead() {
-    return this.notificationsService.removeAllRead();
+  removeAllRead(@CurrentUser() user: JwtPayload) {
+    return this.notificationsService.removeAllReadForUser(user.sub);
   }
 
   @Delete(':id')
