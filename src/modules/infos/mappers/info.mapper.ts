@@ -14,6 +14,8 @@ export class InfoMapper {
       notification: i.notification,
       createdAt: i.createdAt.toISOString(),
       updatedAt: i.updatedAt.toISOString(),
+      deletedAt: i.deletedAt?.toISOString() ?? null,
+      isDeleted: i.deletedAt !== null,
     };
   }
 

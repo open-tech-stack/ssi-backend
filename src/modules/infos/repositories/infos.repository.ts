@@ -8,30 +8,43 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 export class InfosRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  // ------------------------------------------------------------------
+  // CREATE
+  // ------------------------------------------------------------------
   async create(data: Prisma.InfoCreateInput): Promise<Info> {
     return this.prisma.info.create({ data });
   }
 
+  // ------------------------------------------------------------------
+  // READ
+  // ------------------------------------------------------------------
   async findById(id: string): Promise<Info | null> {
     return this.prisma.info.findFirst({
       where: { id, deletedAt: null },
     });
   }
 
-  /**
-   * Tri par défaut : priorité (URGENT > IMPORTANT > NORMAL)
-   * puis date de création la plus récente.
-   * Note : Prisma ne sait pas trier par ordre de priorité personnalisé,
-   * on trie donc d'abord côté DB par date, et on ajustera par priorité
-   * au niveau du service si besoin. Pour rester simple, on trie par date.
-   */
+  /** Trouve une info peu importe son état (actif ou supprimé) */
+  async findByIdAny(id: string): Promise<Info | null> {
+    return this.prisma.info.findUnique({ where: { id } });
+  }
+
   async findMany(params: {
     q?: string;
     priority?: Prisma.InfoWhereInput['priority'];
+    deleted?: 'active' | 'deleted' | 'all';
     skip: number;
     take: number;
   }): Promise<{ items: Info[]; total: number }> {
-    const where: Prisma.InfoWhereInput = { deletedAt: null };
+    const where: Prisma.InfoWhereInput = {};
+
+    // Filtre soft delete
+    if (params.deleted === 'active' || !params.deleted) {
+      where.deletedAt = null;
+    } else if (params.deleted === 'deleted') {
+      where.deletedAt = { not: null };
+    }
+    // 'all' → pas de filtre
 
     if (params.priority) where.priority = params.priority;
 
@@ -56,14 +69,34 @@ export class InfosRepository {
     return { items, total };
   }
 
+  // ------------------------------------------------------------------
+  // UPDATE
+  // ------------------------------------------------------------------
   async update(id: string, data: Prisma.InfoUpdateInput): Promise<Info> {
     return this.prisma.info.update({ where: { id }, data });
   }
 
+  // ------------------------------------------------------------------
+  // SOFT DELETE / RESTORE
+  // ------------------------------------------------------------------
   async softDelete(id: string): Promise<void> {
     await this.prisma.info.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async restore(id: string): Promise<Info> {
+    return this.prisma.info.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE
+  // ------------------------------------------------------------------
+  async hardDelete(id: string): Promise<void> {
+    await this.prisma.info.delete({ where: { id } });
   }
 }

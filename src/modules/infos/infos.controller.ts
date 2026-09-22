@@ -16,11 +16,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { UserRole } from '../../generated/prisma/client.js';
 
-import {
-  CreateInfoDto,
-  QueryInfosDto,
-  UpdateInfoDto,
-} from './dto/index.js';
+import { CreateInfoDto, QueryInfosDto, UpdateInfoDto } from './dto/index.js';
 import { InfosService } from './infos.service.js';
 
 @ApiTags('Infos')
@@ -66,8 +62,30 @@ export class InfosController {
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer une info (soft, ADMIN)' })
+  @ApiOperation({
+    summary: 'Supprimer une info (soft delete, ADMIN)',
+    description:
+      "L'info passe en corbeille. Restaurable via PATCH :id/restore.",
+  })
   remove(@Param('id') id: string) {
     return this.infosService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Restaurer une info supprimée (ADMIN)' })
+  restore(@Param('id') id: string) {
+    return this.infosService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SUPPRESSION DÉFINITIVE (ADMIN)',
+    description: '⚠️ Irréversible.',
+  })
+  hardDelete(@Param('id') id: string) {
+    return this.infosService.hardDelete(id);
   }
 }

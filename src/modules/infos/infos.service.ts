@@ -1,5 +1,10 @@
 // src/modules/infos/infos.service.ts
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { NotificationsHelper } from '../notifications/notifications.helper.js';
 
@@ -38,7 +43,6 @@ export class InfosService {
 
     this.logger.log(`Info créée : ${info.id} (${info.title})`);
 
-    // 🔔 Notification UNIQUEMENT si le flag est activé
     if (dto.notification === true) {
       await this.notifications.notifyInfo({
         id: info.id,
@@ -59,6 +63,7 @@ export class InfosService {
     const { items, total } = await this.repo.findMany({
       q: query.q,
       priority: query.priority,
+      deleted: query.deleted,
       skip,
       take: query.pageSize,
     });
@@ -106,13 +111,43 @@ export class InfosService {
   }
 
   // ------------------------------------------------------------------
-  // DELETE (soft)
+  // SOFT DELETE
   // ------------------------------------------------------------------
   async remove(id: string) {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundException(`Info ${id} introuvable.`);
 
     await this.repo.softDelete(id);
+    this.logger.log(`Info soft-deleted : ${id}`);
+    return { success: true };
+  }
+
+  // ------------------------------------------------------------------
+  // RESTORE
+  // ------------------------------------------------------------------
+  async restore(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Info ${id} introuvable.`);
+    if (!existing.deletedAt) {
+      throw new BadRequestException(
+        "Cette info n'est pas supprimée, impossible de la restaurer.",
+      );
+    }
+
+    const restored = await this.repo.restore(id);
+    this.logger.log(`Info restaurée : ${id}`);
+    return InfoMapper.toResponse(restored);
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE — définitif
+  // ------------------------------------------------------------------
+  async hardDelete(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Info ${id} introuvable.`);
+
+    await this.repo.hardDelete(id);
+    this.logger.warn(`Info SUPPRIMÉE DÉFINITIVEMENT : ${id}`);
     return { success: true };
   }
 }
