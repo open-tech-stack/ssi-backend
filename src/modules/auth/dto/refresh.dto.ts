@@ -1,15 +1,23 @@
 // src/modules/auth/dto/refresh.dto.ts
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MinLength } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 /**
  * DTO de rafraîchissement de token.
+ *
+ * ⚠️ Le `refreshToken` est OPTIONNEL :
+ *  - 🌐 Web    → le refreshToken vient du cookie httpOnly
+ *  - 📱 Mobile → le refreshToken vient du body
+ *
+ * Le controller choisit la source selon le header X-Client.
  */
 export class RefreshDto {
-  @ApiProperty({
-    description: 'Refresh token JWT émis lors du login',
+  @ApiPropertyOptional({
+    description:
+      'Refresh token JWT (mobile uniquement — le web utilise un cookie httpOnly).',
   })
+  @IsOptional()
   @IsString()
   @MinLength(20)
-  refreshToken!: string;
+  refreshToken?: string;
 }
