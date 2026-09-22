@@ -41,4 +41,12 @@ export class EvenementResponse {
 
   @ApiProperty() createdAt!: string;
   @ApiProperty() updatedAt!: string;
+
+  /** Date de soft delete (null si actif) */
+  @ApiPropertyOptional({ nullable: true })
+  deletedAt?: string | null;
+
+  /** Raccourci UI : true si soft-deleted */
+  @ApiProperty()
+  isDeleted!: boolean;
 }

@@ -45,6 +45,9 @@ export class EvenementMapper {
 
       createdAt: e.createdAt.toISOString(),
       updatedAt: e.updatedAt.toISOString(),
+
+      deletedAt: e.deletedAt?.toISOString() ?? null,
+      isDeleted: e.deletedAt !== null,
     };
   }
 

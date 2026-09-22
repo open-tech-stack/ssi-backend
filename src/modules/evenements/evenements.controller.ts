@@ -29,6 +29,10 @@ import { EvenementsService } from './evenements.service.js';
 export class EvenementsController {
   constructor(private readonly evenementsService: EvenementsService) {}
 
+  // ------------------------------------------------------------------
+  // Lecture : ADMIN + MEMBRE
+  // ------------------------------------------------------------------
+
   @Get()
   @ApiOperation({ summary: 'Lister les événements' })
   findAll(@Query() query: QueryEvenementsDto) {
@@ -40,6 +44,10 @@ export class EvenementsController {
   findOne(@Param('id') id: string) {
     return this.evenementsService.findOne(id);
   }
+
+  // ------------------------------------------------------------------
+  // Écriture : ADMIN uniquement
+  // ------------------------------------------------------------------
 
   @Post()
   @Roles(UserRole.ADMIN)
@@ -58,8 +66,31 @@ export class EvenementsController {
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer un événement (soft, ADMIN)' })
+  @ApiOperation({
+    summary: 'Supprimer un événement (soft delete, ADMIN)',
+    description:
+      'L\'événement passe en corbeille. Il peut être restauré via PATCH :id/restore.',
+  })
   remove(@Param('id') id: string) {
     return this.evenementsService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Restaurer un événement supprimé (ADMIN)' })
+  restore(@Param('id') id: string) {
+    return this.evenementsService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SUPPRESSION DÉFINITIVE (ADMIN)',
+    description:
+      '⚠️ Irréversible. Supprime l\'événement en base.',
+  })
+  hardDelete(@Param('id') id: string) {
+    return this.evenementsService.hardDelete(id);
   }
 }

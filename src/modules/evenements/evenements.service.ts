@@ -1,5 +1,10 @@
 // src/modules/evenements/evenements.service.ts
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { NotificationsHelper } from '../notifications/notifications.helper.js';
 
@@ -116,7 +121,6 @@ export class EvenementsService {
     const created = await this.repo.create(data as any);
     this.logger.log(`Événement créé : ${created.id} (${created.kind})`);
 
-    // 🔔 Notification UNIQUEMENT si le flag est activé
     if (dto.notification === true) {
       await this.notifications.notifyEvenement({
         id: created.id,
@@ -139,6 +143,7 @@ export class EvenementsService {
       status: query.status,
       q: query.q,
       period: query.period,
+      deleted: query.deleted,
       skip,
       take: query.pageSize,
     });
@@ -185,13 +190,43 @@ export class EvenementsService {
   }
 
   // ------------------------------------------------------------------
-  // DELETE (soft)
+  // SOFT DELETE
   // ------------------------------------------------------------------
   async remove(id: string) {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundException(`Événement ${id} introuvable.`);
 
     await this.repo.softDelete(id);
+    this.logger.log(`Événement soft-deleted : ${id}`);
+    return { success: true };
+  }
+
+  // ------------------------------------------------------------------
+  // RESTORE
+  // ------------------------------------------------------------------
+  async restore(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Événement ${id} introuvable.`);
+    if (!existing.deletedAt) {
+      throw new BadRequestException(
+        "Cet événement n'est pas supprimé, impossible de le restaurer.",
+      );
+    }
+
+    const restored = await this.repo.restore(id);
+    this.logger.log(`Événement restauré : ${id}`);
+    return EvenementMapper.toResponse(restored);
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE — définitif
+  // ------------------------------------------------------------------
+  async hardDelete(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Événement ${id} introuvable.`);
+
+    await this.repo.hardDelete(id);
+    this.logger.warn(`Événement SUPPRIMÉ DÉFINITIVEMENT : ${id}`);
     return { success: true };
   }
 }
