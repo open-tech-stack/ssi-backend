@@ -1,14 +1,7 @@
 // src/modules/notifications/dto/query-notifications.dto.ts
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import {
-  IsBoolean,
-  IsEnum,
-  IsIn,
-  IsInt,
-  IsOptional,
-  Min,
-} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsIn, IsInt, IsOptional, Min } from 'class-validator';
 
 import { NotificationType } from '../../../generated/prisma/client.js';
 
@@ -22,18 +15,16 @@ export class QueryNotificationsDto {
 
   @ApiPropertyOptional({ description: 'Filtrer par read/unread' })
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(({ value }) => {
+    // Query string → booléen
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return undefined;
+  })
   @IsBoolean()
   read?: boolean;
 
-  /**
-   * Filtre soft delete.
-   *  - active  : par défaut, seules les non-supprimées
-   *  - deleted : uniquement les supprimées (corbeille)
-   *  - all     : tout
-   */
   @ApiPropertyOptional({
-    description: 'Filtre sur les entités supprimées (soft delete)',
     enum: ['active', 'deleted', 'all'],
     default: 'active',
   })
