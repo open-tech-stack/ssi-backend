@@ -29,6 +29,8 @@ export class RappelMapper {
       elements,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
+      deletedAt: r.deletedAt?.toISOString() ?? null,
+      isDeleted: r.deletedAt !== null,
     };
   }
 

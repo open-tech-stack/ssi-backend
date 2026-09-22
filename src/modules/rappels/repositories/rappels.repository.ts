@@ -51,13 +51,28 @@ export class RappelsRepository {
     });
   }
 
+  async findByIdAny(id: string): Promise<RappelWithElements | null> {
+    return this.prisma.rappel.findUnique({
+      where: { id },
+      include: RAPPEL_INCLUDE,
+    });
+  }
+
   async findMany(params: {
     q?: string;
     priority?: Prisma.RappelWhereInput['priority'];
+    deleted?: 'active' | 'deleted' | 'all';
     skip: number;
     take: number;
   }): Promise<{ items: RappelWithElements[]; total: number }> {
-    const where: Prisma.RappelWhereInput = { deletedAt: null };
+    const where: Prisma.RappelWhereInput = {};
+
+    // Filtre soft delete
+    if (params.deleted === 'active' || !params.deleted) {
+      where.deletedAt = null;
+    } else if (params.deleted === 'deleted') {
+      where.deletedAt = { not: null };
+    }
 
     if (params.priority) where.priority = params.priority;
 
@@ -98,7 +113,6 @@ export class RappelsRepository {
     return this.prisma.$transaction(async (tx) => {
       await tx.rappel.update({ where: { id }, data });
 
-      // Si le client renvoie des éléments → on remplace toute la liste
       if (elements !== undefined) {
         await tx.rappelElement.deleteMany({ where: { rappelId: id } });
 
@@ -121,14 +135,27 @@ export class RappelsRepository {
   }
 
   // ------------------------------------------------------------------
-  // DELETE (soft + cascade des éléments via Prisma)
+  // SOFT DELETE / RESTORE
   // ------------------------------------------------------------------
   async softDelete(id: string): Promise<void> {
-    // Le soft delete du rappel n'efface PAS les éléments (ils restent en base)
-    // pour préserver l'historique. Ils ne sont juste plus renvoyés.
     await this.prisma.rappel.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async restore(id: string): Promise<RappelWithElements> {
+    return this.prisma.rappel.update({
+      where: { id },
+      data: { deletedAt: null },
+      include: RAPPEL_INCLUDE,
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE — supprime le rappel + ses éléments (cascade)
+  // ------------------------------------------------------------------
+  async hardDelete(id: string): Promise<void> {
+    await this.prisma.rappel.delete({ where: { id } });
   }
 }

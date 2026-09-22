@@ -15,6 +15,8 @@ export class PriereMapper {
       notification: p.notification,
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
+      deletedAt: p.deletedAt?.toISOString() ?? null,
+      isDeleted: p.deletedAt !== null,
     };
   }
 

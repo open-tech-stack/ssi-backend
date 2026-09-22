@@ -1,5 +1,10 @@
 // src/modules/prieres/prieres.service.ts
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { NotificationsHelper } from '../notifications/notifications.helper.js';
 
@@ -39,7 +44,6 @@ export class PrieresService {
 
     this.logger.log(`Prière créée : ${priere.id} (${priere.title})`);
 
-    // 🔔 Notification UNIQUEMENT si le flag est activé
     if (dto.notification === true) {
       await this.notifications.notifyPriere({
         id: priere.id,
@@ -59,6 +63,7 @@ export class PrieresService {
     const { items, total } = await this.repo.findMany({
       q: query.q,
       priority: query.priority,
+      deleted: query.deleted,
       skip,
       take: query.pageSize,
     });
@@ -103,7 +108,11 @@ export class PrieresService {
     const updated = await this.repo.update(id, {
       title: dto.title?.trim(),
       date:
-        dto.date !== undefined ? (dto.date ? new Date(dto.date) : null) : undefined,
+        dto.date !== undefined
+          ? dto.date
+            ? new Date(dto.date)
+            : null
+          : undefined,
       location:
         dto.location !== undefined ? dto.location?.trim() || null : undefined,
       detail:
@@ -116,13 +125,43 @@ export class PrieresService {
   }
 
   // ------------------------------------------------------------------
-  // DELETE (soft)
+  // SOFT DELETE
   // ------------------------------------------------------------------
   async remove(id: string) {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundException(`Prière ${id} introuvable.`);
 
     await this.repo.softDelete(id);
+    this.logger.log(`Prière soft-deleted : ${id}`);
+    return { success: true };
+  }
+
+  // ------------------------------------------------------------------
+  // RESTORE
+  // ------------------------------------------------------------------
+  async restore(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Prière ${id} introuvable.`);
+    if (!existing.deletedAt) {
+      throw new BadRequestException(
+        "Cette prière n'est pas supprimée, impossible de la restaurer.",
+      );
+    }
+
+    const restored = await this.repo.restore(id);
+    this.logger.log(`Prière restaurée : ${id}`);
+    return PriereMapper.toResponse(restored);
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE
+  // ------------------------------------------------------------------
+  async hardDelete(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Prière ${id} introuvable.`);
+
+    await this.repo.hardDelete(id);
+    this.logger.warn(`Prière SUPPRIMÉE DÉFINITIVEMENT : ${id}`);
     return { success: true };
   }
 }

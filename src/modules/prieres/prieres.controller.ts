@@ -66,8 +66,28 @@ export class PrieresController {
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer une prière (soft, ADMIN)' })
+  @ApiOperation({
+    summary: 'Supprimer une prière (soft delete, ADMIN)',
+  })
   remove(@Param('id') id: string) {
     return this.prieresService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Restaurer une prière supprimée (ADMIN)' })
+  restore(@Param('id') id: string) {
+    return this.prieresService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SUPPRESSION DÉFINITIVE (ADMIN)',
+    description: '⚠️ Irréversible.',
+  })
+  hardDelete(@Param('id') id: string) {
+    return this.prieresService.hardDelete(id);
   }
 }

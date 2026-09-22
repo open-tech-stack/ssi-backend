@@ -8,29 +8,41 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 export class PrieresRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  // ------------------------------------------------------------------
+  // CREATE
+  // ------------------------------------------------------------------
   async create(data: Prisma.PriereCreateInput): Promise<Priere> {
     return this.prisma.priere.create({ data });
   }
 
+  // ------------------------------------------------------------------
+  // READ
+  // ------------------------------------------------------------------
   async findById(id: string): Promise<Priere | null> {
     return this.prisma.priere.findFirst({
       where: { id, deletedAt: null },
     });
   }
 
-  /**
-   * Tri par défaut :
-   *  - Si `date` est renseignée, les plus proches d'abord (futur → présent).
-   *  - Sinon, par date de création décroissante.
-   * Prisma ne sait pas trier "date non null d'abord", on trie côté service.
-   */
+  async findByIdAny(id: string): Promise<Priere | null> {
+    return this.prisma.priere.findUnique({ where: { id } });
+  }
+
   async findMany(params: {
     q?: string;
     priority?: Prisma.PriereWhereInput['priority'];
+    deleted?: 'active' | 'deleted' | 'all';
     skip: number;
     take: number;
   }): Promise<{ items: Priere[]; total: number }> {
-    const where: Prisma.PriereWhereInput = { deletedAt: null };
+    const where: Prisma.PriereWhereInput = {};
+
+    // Filtre soft delete
+    if (params.deleted === 'active' || !params.deleted) {
+      where.deletedAt = null;
+    } else if (params.deleted === 'deleted') {
+      where.deletedAt = { not: null };
+    }
 
     if (params.priority) where.priority = params.priority;
 
@@ -55,14 +67,34 @@ export class PrieresRepository {
     return { items, total };
   }
 
+  // ------------------------------------------------------------------
+  // UPDATE
+  // ------------------------------------------------------------------
   async update(id: string, data: Prisma.PriereUpdateInput): Promise<Priere> {
     return this.prisma.priere.update({ where: { id }, data });
   }
 
+  // ------------------------------------------------------------------
+  // SOFT DELETE / RESTORE
+  // ------------------------------------------------------------------
   async softDelete(id: string): Promise<void> {
     await this.prisma.priere.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async restore(id: string): Promise<Priere> {
+    return this.prisma.priere.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE
+  // ------------------------------------------------------------------
+  async hardDelete(id: string): Promise<void> {
+    await this.prisma.priere.delete({ where: { id } });
   }
 }

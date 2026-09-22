@@ -66,8 +66,28 @@ export class RappelsController {
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer un rappel (soft, ADMIN)' })
+  @ApiOperation({
+    summary: 'Supprimer un rappel (soft delete, ADMIN)',
+  })
   remove(@Param('id') id: string) {
     return this.rappelsService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Restaurer un rappel supprimé (ADMIN)' })
+  restore(@Param('id') id: string) {
+    return this.rappelsService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SUPPRESSION DÉFINITIVE (ADMIN)',
+    description: '⚠️ Irréversible. Supprime le rappel et ses éléments.',
+  })
+  hardDelete(@Param('id') id: string) {
+    return this.rappelsService.hardDelete(id);
   }
 }
