@@ -24,20 +24,27 @@ export class NotificationsRepository {
     });
   }
 
-  /**
-   * Liste paginée, AVEC le statut `read` calculé pour un user donné.
-   *
-   * Retourne chaque notification enrichie d'un champ `read: boolean`
-   * indiquant si CE user l'a lue.
-   */
+  async findByIdAny(id: string): Promise<Notification | null> {
+    return this.prisma.notification.findUnique({ where: { id } });
+  }
+
   async findManyForUser(params: {
     userId: string;
     type?: Prisma.NotificationWhereInput['type'];
     read?: boolean;
+    deleted?: 'active' | 'deleted' | 'all';
     skip: number;
     take: number;
   }): Promise<{ items: (Notification & { read: boolean })[]; total: number }> {
-    const where: Prisma.NotificationWhereInput = { deletedAt: null };
+    const where: Prisma.NotificationWhereInput = {};
+
+    // Filtre soft delete
+    if (params.deleted === 'active' || !params.deleted) {
+      where.deletedAt = null;
+    } else if (params.deleted === 'deleted') {
+      where.deletedAt = { not: null };
+    }
+    // 'all' → pas de filtre
 
     if (params.type) where.type = params.type;
 
@@ -78,7 +85,7 @@ export class NotificationsRepository {
   }
 
   /**
-   * Compte les notifications non lues POUR UN USER donné.
+   * Compte les non lues pour un user (uniquement les non supprimées).
    */
   async countUnreadForUser(userId: string): Promise<number> {
     return this.prisma.notification.count({
@@ -92,26 +99,17 @@ export class NotificationsRepository {
   // ------------------------------------------------------------------
   // MARK READ (par user)
   // ------------------------------------------------------------------
-  /**
-   * Marque une notification comme lue pour un user.
-   * Idempotent : si déjà lue, ne fait rien.
-   */
   async markReadForUser(userId: string, notificationId: string): Promise<void> {
     await this.prisma.notificationRead.upsert({
       where: {
         userId_notificationId: { userId, notificationId },
       },
       create: { userId, notificationId },
-      update: {}, // si déjà lu, ne rien changer
+      update: {},
     });
   }
 
-  /**
-   * Marque TOUTES les notifications non lues comme lues pour un user.
-   * Retourne le nombre de notifications nouvellement marquées.
-   */
   async markAllReadForUser(userId: string): Promise<number> {
-    // Récupère les notifications non lues pour ce user
     const unread = await this.prisma.notification.findMany({
       where: {
         deletedAt: null,
@@ -122,7 +120,6 @@ export class NotificationsRepository {
 
     if (unread.length === 0) return 0;
 
-    // Insère les entrées en batch
     await this.prisma.notificationRead.createMany({
       data: unread.map((n) => ({ userId, notificationId: n.id })),
       skipDuplicates: true,
@@ -132,7 +129,7 @@ export class NotificationsRepository {
   }
 
   // ------------------------------------------------------------------
-  // DELETE
+  // SOFT DELETE (global, admin)
   // ------------------------------------------------------------------
   async softDelete(id: string): Promise<void> {
     await this.prisma.notification.update({
@@ -141,17 +138,17 @@ export class NotificationsRepository {
     });
   }
 
-  /**
-   * Supprime toutes les notifications LUES PAR UN USER donné.
-   */
-  async softDeleteAllReadForUser(userId: string): Promise<number> {
-    const res = await this.prisma.notification.updateMany({
-      where: {
-        deletedAt: null,
-        reads: { some: { userId } },
-      },
-      data: { deletedAt: new Date() },
+  async restore(id: string): Promise<Notification> {
+    return this.prisma.notification.update({
+      where: { id },
+      data: { deletedAt: null },
     });
-    return res.count;
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE
+  // ------------------------------------------------------------------
+  async hardDelete(id: string): Promise<void> {
+    await this.prisma.notification.delete({ where: { id } });
   }
 }

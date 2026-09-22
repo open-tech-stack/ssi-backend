@@ -1,5 +1,10 @@
 // src/modules/notifications/notifications.service.ts
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 
 import type { CreateNotificationDto } from './dto/create-notification.dto.js';
 import type { QueryNotificationsDto } from './dto/query-notifications.dto.js';
@@ -27,7 +32,6 @@ export class NotificationsService {
     this.logger.log(
       `Notification créée : ${notification.id} (${notification.type})`,
     );
-    // Le read est calculé par user → on renvoie false par défaut
     return NotificationMapper.toResponse({ ...notification, read: false });
   }
 
@@ -41,6 +45,7 @@ export class NotificationsService {
       userId,
       type: query.type,
       read: query.read,
+      deleted: query.deleted,
       skip,
       take: query.pageSize,
     });
@@ -61,8 +66,6 @@ export class NotificationsService {
     if (!notification) {
       throw new NotFoundException(`Notification ${id} introuvable.`);
     }
-    // Note : on pourrait ajouter `read` ici, mais l'usage principal
-    // est de lister. Garde simple.
     return NotificationMapper.toResponse({ ...notification, read: false });
   }
 
@@ -72,7 +75,7 @@ export class NotificationsService {
   }
 
   // ------------------------------------------------------------------
-  // MARK READ (par user)
+  // MARK READ
   // ------------------------------------------------------------------
   async markReadForUser(userId: string, id: string) {
     const existing = await this.repo.findById(id);
@@ -89,7 +92,7 @@ export class NotificationsService {
   }
 
   // ------------------------------------------------------------------
-  // DELETE
+  // SOFT DELETE (admin)
   // ------------------------------------------------------------------
   async remove(id: string) {
     const existing = await this.repo.findById(id);
@@ -97,11 +100,38 @@ export class NotificationsService {
       throw new NotFoundException(`Notification ${id} introuvable.`);
     }
     await this.repo.softDelete(id);
+    this.logger.log(`Notification soft-deleted : ${id}`);
     return { success: true };
   }
 
-  async removeAllReadForUser(userId: string) {
-    const count = await this.repo.softDeleteAllReadForUser(userId);
-    return { success: true, count };
+  // ------------------------------------------------------------------
+  // RESTORE (admin)
+  // ------------------------------------------------------------------
+  async restore(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) {
+      throw new NotFoundException(`Notification ${id} introuvable.`);
+    }
+    if (!existing.deletedAt) {
+      throw new BadRequestException(
+        "Cette notification n'est pas supprimée, impossible de la restaurer.",
+      );
+    }
+    const restored = await this.repo.restore(id);
+    this.logger.log(`Notification restaurée : ${id}`);
+    return NotificationMapper.toResponse({ ...restored, read: false });
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE (admin)
+  // ------------------------------------------------------------------
+  async hardDelete(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) {
+      throw new NotFoundException(`Notification ${id} introuvable.`);
+    }
+    await this.repo.hardDelete(id);
+    this.logger.warn(`Notification SUPPRIMÉE DÉFINITIVEMENT : ${id}`);
+    return { success: true };
   }
 }

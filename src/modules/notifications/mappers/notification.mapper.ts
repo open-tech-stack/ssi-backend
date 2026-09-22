@@ -23,6 +23,8 @@ export class NotificationMapper {
       pushed: n.pushed,
       createdAt: n.createdAt.toISOString(),
       updatedAt: n.updatedAt.toISOString(),
+      deletedAt: n.deletedAt?.toISOString() ?? null,
+      isDeleted: n.deletedAt !== null,
     };
   }
 

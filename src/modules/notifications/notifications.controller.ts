@@ -63,7 +63,9 @@ export class NotificationsController {
   }
 
   @Patch('read-all')
-  @ApiOperation({ summary: 'Marquer toutes les notifications comme lues (par user)' })
+  @ApiOperation({
+    summary: 'Marquer toutes les notifications comme lues (par user)',
+  })
   markAllRead(@CurrentUser() user: JwtPayload) {
     return this.notificationsService.markAllReadForUser(user.sub);
   }
@@ -80,22 +82,40 @@ export class NotificationsController {
   }
 
   // ------------------------------------------------------------------
-  // DELETE
+  // SOFT DELETE (ADMIN)
   // ------------------------------------------------------------------
-
-  @Delete('read')
-  @Roles(UserRole.ADMIN)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer toutes les notifications lues (ADMIN)' })
-  removeAllRead(@CurrentUser() user: JwtPayload) {
-    return this.notificationsService.removeAllReadForUser(user.sub);
-  }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer (soft) une notification (ADMIN)' })
+  @ApiOperation({
+    summary: 'Supprimer (soft) une notification (ADMIN)',
+    description:
+      '⚠️ Suppression GLOBALE : la notification disparaît pour tous les utilisateurs.',
+  })
   remove(@Param('id') id: string) {
     return this.notificationsService.remove(id);
+  }
+
+  // ------------------------------------------------------------------
+  // RESTORE / HARD DELETE (ADMIN)
+  // ------------------------------------------------------------------
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Restaurer une notification supprimée (ADMIN)' })
+  restore(@Param('id') id: string) {
+    return this.notificationsService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SUPPRESSION DÉFINITIVE (ADMIN)',
+    description: '⚠️ Irréversible.',
+  })
+  hardDelete(@Param('id') id: string) {
+    return this.notificationsService.hardDelete(id);
   }
 }
