@@ -16,6 +16,8 @@ export class PersonMapper {
       avatar: p.avatar,
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
+      deletedAt: p.deletedAt?.toISOString() ?? null,
+      isDeleted: p.deletedAt !== null,
     };
   }
 

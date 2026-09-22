@@ -10,6 +10,8 @@ export class GroupMapper {
       description: g.description,
       createdAt: g.createdAt.toISOString(),
       updatedAt: g.updatedAt.toISOString(),
+      deletedAt: g.deletedAt?.toISOString() ?? null,
+      isDeleted: g.deletedAt !== null,
     };
   }
 

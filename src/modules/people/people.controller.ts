@@ -30,25 +30,17 @@ export class PeopleController {
   constructor(private readonly peopleService: PeopleService) {}
 
   // ------------------------------------------------------------------
-  // PUBLIC (ADMIN + MEMBRE) : lecture
+  // Lecture : ADMIN + MEMBRE
   // ------------------------------------------------------------------
 
   @Get()
-  @ApiOperation({
-    summary: 'Lister les personnes (ADMIN + MEMBRE)',
-  })
+  @ApiOperation({ summary: 'Lister les personnes (ADMIN + MEMBRE)' })
   findAll(@Query() query: QueryPeopleDto) {
     return this.peopleService.findAll(query);
   }
 
-  /**
-   * Version minimale publique (id + fullName uniquement).
-   * Idéal pour le mobile : afficher qui est au programme.
-   */
   @Get('public')
-  @ApiOperation({
-    summary: 'Liste publique minimale (id + nom complet)',
-  })
+  @ApiOperation({ summary: 'Liste publique minimale (id + nom complet)' })
   findAllPublic(@Query() query: QueryPeopleDto) {
     return this.peopleService.findAllPublic(query);
   }
@@ -60,7 +52,7 @@ export class PeopleController {
   }
 
   // ------------------------------------------------------------------
-  // ADMIN : écriture
+  // Écriture : ADMIN uniquement
   // ------------------------------------------------------------------
 
   @Post()
@@ -80,8 +72,28 @@ export class PeopleController {
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer une personne (soft, ADMIN)' })
+  @ApiOperation({
+    summary: 'Supprimer une personne (soft delete, ADMIN)',
+  })
   remove(@Param('id') id: string) {
     return this.peopleService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Restaurer une personne supprimée (ADMIN)' })
+  restore(@Param('id') id: string) {
+    return this.peopleService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SUPPRESSION DÉFINITIVE (ADMIN)',
+    description: '⚠️ Irréversible.',
+  })
+  hardDelete(@Param('id') id: string) {
+    return this.peopleService.hardDelete(id);
   }
 }

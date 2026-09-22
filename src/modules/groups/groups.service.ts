@@ -1,5 +1,6 @@
 // src/modules/groups/groups.service.ts
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -18,6 +19,9 @@ export class GroupsService {
 
   constructor(private readonly repo: GroupsRepository) {}
 
+  // ------------------------------------------------------------------
+  // CREATE
+  // ------------------------------------------------------------------
   async create(dto: CreateGroupDto) {
     const name = dto.name.trim();
     if (await this.repo.existsByName(name)) {
@@ -33,10 +37,14 @@ export class GroupsService {
     return GroupMapper.toResponse(group);
   }
 
+  // ------------------------------------------------------------------
+  // READ
+  // ------------------------------------------------------------------
   async findAll(query: QueryGroupsDto) {
     const skip = (query.page - 1) * query.pageSize;
     const { items, total } = await this.repo.findMany({
       q: query.q,
+      deleted: query.deleted,
       skip,
       take: query.pageSize,
     });
@@ -58,6 +66,9 @@ export class GroupsService {
     return GroupMapper.toResponse(group);
   }
 
+  // ------------------------------------------------------------------
+  // UPDATE
+  // ------------------------------------------------------------------
   async update(id: string, dto: UpdateGroupDto) {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundException(`Group ${id} introuvable.`);
@@ -80,11 +91,44 @@ export class GroupsService {
     return GroupMapper.toResponse(updated);
   }
 
+  // ------------------------------------------------------------------
+  // SOFT DELETE
+  // ------------------------------------------------------------------
   async remove(id: string) {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundException(`Group ${id} introuvable.`);
 
     await this.repo.softDelete(id);
+    this.logger.log(`Group soft-deleted : ${id}`);
+    return { success: true };
+  }
+
+  // ------------------------------------------------------------------
+  // RESTORE
+  // ------------------------------------------------------------------
+  async restore(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Group ${id} introuvable.`);
+    if (!existing.deletedAt) {
+      throw new BadRequestException(
+        "Ce groupe n'est pas supprimé, impossible de le restaurer.",
+      );
+    }
+
+    const restored = await this.repo.restore(id);
+    this.logger.log(`Group restauré : ${id}`);
+    return GroupMapper.toResponse(restored);
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE
+  // ------------------------------------------------------------------
+  async hardDelete(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Group ${id} introuvable.`);
+
+    await this.repo.hardDelete(id);
+    this.logger.warn(`Group SUPPRIMÉ DÉFINITIVEMENT : ${id}`);
     return { success: true };
   }
 }

@@ -1,5 +1,6 @@
 // src/modules/people/people.service.ts
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -21,10 +22,6 @@ export class PeopleService {
   // ------------------------------------------------------------------
   // HELPERS
   // ------------------------------------------------------------------
-  /**
-   * Construit le fullName : si non fourni, on combine firstName + lastName.
-   * Si fourni, on le garde tel quel.
-   */
   private buildFullName(dto: {
     firstName: string;
     lastName?: string | null;
@@ -45,7 +42,6 @@ export class PeopleService {
   async create(dto: CreatePersonDto) {
     const fullName = this.buildFullName(dto);
 
-    // Unicité (optionnelle — on prévient les doublons visibles)
     const exists = await this.repo.existsByFullName(fullName);
     if (exists) {
       throw new ConflictException(
@@ -73,6 +69,7 @@ export class PeopleService {
 
     const { items, total } = await this.repo.findMany({
       q: query.q,
+      deleted: query.deleted,
       skip,
       take: query.pageSize,
     });
@@ -89,14 +86,14 @@ export class PeopleService {
   }
 
   /**
-   * Version minimale publique (id + fullName) — utilisée par le mobile
-   * pour afficher "qui est au programme".
+   * Version publique minimale (id + fullName) — utilisée par le mobile.
    */
   async findAllPublic(query: QueryPeopleDto) {
     const skip = (query.page - 1) * query.pageSize;
 
     const { items, total } = await this.repo.findMany({
       q: query.q,
+      deleted: 'active', // toujours actives
       skip,
       take: query.pageSize,
     });
@@ -134,7 +131,6 @@ export class PeopleService {
       fullName: dto.fullName ?? existing.fullName,
     });
 
-    // Si le fullName change, on vérifie qu'il n'entre pas en conflit
     if (nextFullName !== existing.fullName) {
       const exists = await this.repo.existsByFullName(nextFullName);
       if (exists) {
@@ -156,13 +152,43 @@ export class PeopleService {
   }
 
   // ------------------------------------------------------------------
-  // DELETE
+  // SOFT DELETE
   // ------------------------------------------------------------------
   async remove(id: string) {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundException(`Person ${id} introuvable.`);
 
     await this.repo.softDelete(id);
+    this.logger.log(`Person soft-deleted : ${id}`);
+    return { success: true };
+  }
+
+  // ------------------------------------------------------------------
+  // RESTORE
+  // ------------------------------------------------------------------
+  async restore(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Person ${id} introuvable.`);
+    if (!existing.deletedAt) {
+      throw new BadRequestException(
+        "Cette personne n'est pas supprimée, impossible de la restaurer.",
+      );
+    }
+
+    const restored = await this.repo.restore(id);
+    this.logger.log(`Person restaurée : ${id}`);
+    return PersonMapper.toResponse(restored);
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE
+  // ------------------------------------------------------------------
+  async hardDelete(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Person ${id} introuvable.`);
+
+    await this.repo.hardDelete(id);
+    this.logger.warn(`Person SUPPRIMÉE DÉFINITIVEMENT : ${id}`);
     return { success: true };
   }
 }

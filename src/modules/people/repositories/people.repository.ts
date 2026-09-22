@@ -8,22 +8,40 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 export class PeopleRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  // ------------------------------------------------------------------
+  // CREATE
+  // ------------------------------------------------------------------
   async create(data: Prisma.PersonCreateInput): Promise<Person> {
     return this.prisma.person.create({ data });
   }
 
+  // ------------------------------------------------------------------
+  // READ
+  // ------------------------------------------------------------------
   async findById(id: string): Promise<Person | null> {
     return this.prisma.person.findFirst({
       where: { id, deletedAt: null },
     });
   }
 
+  async findByIdAny(id: string): Promise<Person | null> {
+    return this.prisma.person.findUnique({ where: { id } });
+  }
+
   async findMany(params: {
     q?: string;
+    deleted?: 'active' | 'deleted' | 'all';
     skip: number;
     take: number;
   }): Promise<{ items: Person[]; total: number }> {
-    const where: Prisma.PersonWhereInput = { deletedAt: null };
+    const where: Prisma.PersonWhereInput = {};
+
+    // Filtre soft delete
+    if (params.deleted === 'active' || !params.deleted) {
+      where.deletedAt = null;
+    } else if (params.deleted === 'deleted') {
+      where.deletedAt = { not: null };
+    }
 
     if (params.q) {
       where.OR = [
@@ -46,17 +64,40 @@ export class PeopleRepository {
     return { items, total };
   }
 
+  // ------------------------------------------------------------------
+  // UPDATE
+  // ------------------------------------------------------------------
   async update(id: string, data: Prisma.PersonUpdateInput): Promise<Person> {
     return this.prisma.person.update({ where: { id }, data });
   }
 
-  async softDelete(id: string): Promise<Person> {
-    return this.prisma.person.update({
+  // ------------------------------------------------------------------
+  // SOFT DELETE / RESTORE
+  // ------------------------------------------------------------------
+  async softDelete(id: string): Promise<void> {
+    await this.prisma.person.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
   }
 
+  async restore(id: string): Promise<Person> {
+    return this.prisma.person.update({
+      where: { id },
+      data: { deletedAt: null },
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE
+  // ------------------------------------------------------------------
+  async hardDelete(id: string): Promise<void> {
+    await this.prisma.person.delete({ where: { id } });
+  }
+
+  // ------------------------------------------------------------------
+  // HELPERS
+  // ------------------------------------------------------------------
   async existsByFullName(fullName: string): Promise<boolean> {
     const count = await this.prisma.person.count({
       where: { fullName, deletedAt: null },

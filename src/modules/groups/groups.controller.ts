@@ -29,6 +29,10 @@ import { GroupsService } from './groups.service.js';
 export class GroupsController {
   constructor(private readonly groupsService: GroupsService) {}
 
+  // ------------------------------------------------------------------
+  // Lecture : ADMIN + MEMBRE
+  // ------------------------------------------------------------------
+
   @Get()
   @ApiOperation({ summary: 'Lister les groupes' })
   findAll(@Query() query: QueryGroupsDto) {
@@ -40,6 +44,10 @@ export class GroupsController {
   findOne(@Param('id') id: string) {
     return this.groupsService.findOne(id);
   }
+
+  // ------------------------------------------------------------------
+  // Écriture : ADMIN uniquement
+  // ------------------------------------------------------------------
 
   @Post()
   @Roles(UserRole.ADMIN)
@@ -58,8 +66,28 @@ export class GroupsController {
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer un groupe (soft, ADMIN)' })
+  @ApiOperation({
+    summary: 'Supprimer un groupe (soft delete, ADMIN)',
+  })
   remove(@Param('id') id: string) {
     return this.groupsService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Restaurer un groupe supprimé (ADMIN)' })
+  restore(@Param('id') id: string) {
+    return this.groupsService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SUPPRESSION DÉFINITIVE (ADMIN)',
+    description: '⚠️ Irréversible.',
+  })
+  hardDelete(@Param('id') id: string) {
+    return this.groupsService.hardDelete(id);
   }
 }

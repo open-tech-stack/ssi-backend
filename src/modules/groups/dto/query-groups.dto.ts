@@ -1,13 +1,24 @@
 // src/modules/groups/dto/query-groups.dto.ts
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+
+export type DeletedFilter = 'active' | 'deleted' | 'all';
 
 export class QueryGroupsDto {
   @ApiPropertyOptional({ example: 'musical' })
   @IsOptional()
   @IsString()
   q?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filtre sur les entités supprimées (soft delete)',
+    enum: ['active', 'deleted', 'all'],
+    default: 'active',
+  })
+  @IsOptional()
+  @IsIn(['active', 'deleted', 'all'])
+  deleted: DeletedFilter = 'active';
 
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()

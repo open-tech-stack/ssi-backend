@@ -25,11 +25,18 @@ export class PersonResponse {
 
   @ApiProperty({ example: '2026-09-16T12:00:00.000Z' })
   updatedAt!: string;
+
+  /** Date de soft delete (null si actif) */
+  @ApiPropertyOptional({ nullable: true })
+  deletedAt?: string | null;
+
+  /** Raccourci UI : true si soft-deleted */
+  @ApiProperty()
+  isDeleted!: boolean;
 }
 
 /**
- * Version "publique" minimale — utile pour le mobile
- * (afficher qui est au programme sans exposer d'infos sensibles).
+ * Version "publique" minimale — utile pour le mobile.
  */
 export class PersonPublicResponse {
   @ApiProperty({ example: 'clx123' })
