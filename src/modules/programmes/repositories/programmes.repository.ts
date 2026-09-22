@@ -6,9 +6,6 @@ import { PrismaService } from '../../../prisma/prisma.service.js';
 
 import type { ProgrammeWithRelations } from '../mappers/programme.mapper.js';
 
-/**
- * Include standard — évite la répétition dans toutes les méthodes.
- */
 const PROGRAMME_INCLUDE = {
   sections: {
     include: {
@@ -25,7 +22,7 @@ export class ProgrammesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   // ------------------------------------------------------------------
-  // CREATE — programme + sections + personnes en une transaction
+  // CREATE
   // ------------------------------------------------------------------
   async create(
     data: Omit<Prisma.ProgrammeCreateInput, 'sections'>,
@@ -53,7 +50,6 @@ export class ProgrammesRepository {
           },
         });
 
-        // Personnes liées
         if (s.personIds && s.personIds.length > 0) {
           await tx.programmeSectionPerson.createMany({
             data: s.personIds.map((personId) => ({
@@ -64,7 +60,6 @@ export class ProgrammesRepository {
         }
       }
 
-      // Recharge avec toutes les relations
       return tx.programme.findUniqueOrThrow({
         where: { id: programme.id },
         include: PROGRAMME_INCLUDE,
@@ -82,15 +77,35 @@ export class ProgrammesRepository {
     });
   }
 
+  /**
+   * Trouve un programme peu importe son état (actif ou supprimé).
+   * Utile pour restore/hardDelete.
+   */
+  async findByIdAny(id: string): Promise<ProgrammeWithRelations | null> {
+    return this.prisma.programme.findUnique({
+      where: { id },
+      include: PROGRAMME_INCLUDE,
+    });
+  }
+
   async findMany(params: {
     kind?: Prisma.ProgrammeWhereInput['kind'];
     status?: Prisma.ProgrammeWhereInput['status'];
     q?: string;
     period?: 'upcoming' | 'past' | 'all';
+    deleted?: 'active' | 'deleted' | 'all';
     skip: number;
     take: number;
   }): Promise<{ items: ProgrammeWithRelations[]; total: number }> {
-    const where: Prisma.ProgrammeWhereInput = { deletedAt: null };
+    const where: Prisma.ProgrammeWhereInput = {};
+
+    // Filtre soft delete
+    if (params.deleted === 'active' || !params.deleted) {
+      where.deletedAt = null;
+    } else if (params.deleted === 'deleted') {
+      where.deletedAt = { not: null };
+    }
+    // 'all' → pas de filtre
 
     if (params.kind) where.kind = params.kind;
     if (params.status) where.status = params.status;
@@ -106,10 +121,7 @@ export class ProgrammesRepository {
     if (params.period && params.period !== 'all') {
       const now = new Date();
       if (params.period === 'upcoming') {
-        where.OR = [
-          { startsAt: { gte: now } },
-          { startsAt: null },
-        ];
+        where.OR = [{ startsAt: { gte: now } }, { startsAt: null }];
       } else if (params.period === 'past') {
         where.startsAt = { lt: now };
       }
@@ -147,7 +159,6 @@ export class ProgrammesRepository {
     return this.prisma.$transaction(async (tx) => {
       await tx.programme.update({ where: { id }, data });
 
-      // Si on remplace les sections → on supprime les anciennes et on recrée
       if (sections) {
         await tx.programmeSection.deleteMany({ where: { programmeId: id } });
 
@@ -182,12 +193,29 @@ export class ProgrammesRepository {
   }
 
   // ------------------------------------------------------------------
-  // DELETE (soft)
+  // SOFT DELETE / RESTORE
   // ------------------------------------------------------------------
   async softDelete(id: string): Promise<void> {
     await this.prisma.programme.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+  }
+
+  async restore(id: string): Promise<ProgrammeWithRelations> {
+    return this.prisma.programme.update({
+      where: { id },
+      data: { deletedAt: null },
+      include: PROGRAMME_INCLUDE,
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE — définitif, irréversible
+  // ------------------------------------------------------------------
+  async hardDelete(id: string): Promise<void> {
+    // Grâce aux onDelete: Cascade sur ProgrammeSection, les sections
+    // sont supprimées automatiquement. Idem pour ProgrammeSectionPerson.
+    await this.prisma.programme.delete({ where: { id } });
   }
 }

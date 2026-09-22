@@ -9,6 +9,7 @@ import {
 } from '../../../generated/prisma/client.js';
 
 export type PeriodFilter = 'upcoming' | 'past' | 'all';
+export type DeletedFilter = 'active' | 'deleted' | 'all';
 
 export class QueryProgrammesDto {
   @ApiPropertyOptional({ enum: ProgrammeKind })
@@ -28,13 +29,28 @@ export class QueryProgrammesDto {
   @IsString()
   q?: string;
 
- @ApiPropertyOptional({
+  @ApiPropertyOptional({
     description: '"upcoming" = futurs uniquement',
     enum: ['upcoming', 'past', 'all'],
   })
   @IsOptional()
   @IsIn(['upcoming', 'past', 'all'])
   period?: PeriodFilter;
+
+  /**
+   * Filtre sur les supprimés (soft delete).
+   *  - active  : par défaut, seuls les non-supprimés
+   *  - deleted : uniquement les supprimés (corbeille)
+   *  - all     : tout (actifs + supprimés)
+   */
+  @ApiPropertyOptional({
+    description: 'Filtre sur les entités supprimées (soft delete)',
+    enum: ['active', 'deleted', 'all'],
+    default: 'active',
+  })
+  @IsOptional()
+  @IsIn(['active', 'deleted', 'all'])
+  deleted: DeletedFilter = 'active';
 
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()

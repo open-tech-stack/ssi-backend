@@ -66,8 +66,31 @@ export class ProgrammesController {
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Supprimer un programme (soft, ADMIN)' })
+  @ApiOperation({
+    summary: 'Supprimer un programme (soft delete, ADMIN)',
+    description:
+      'Le programme passe en corbeille. Il peut être restauré via PATCH :id/restore.',
+  })
   remove(@Param('id') id: string) {
     return this.programmesService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Restaurer un programme supprimé (ADMIN)' })
+  restore(@Param('id') id: string) {
+    return this.programmesService.restore(id);
+  }
+
+  @Delete(':id/permanent')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'SUPPRESSION DÉFINITIVE (ADMIN)',
+    description:
+      '⚠️ Irréversible. Supprime le programme et toutes ses sections en base.',
+  })
+  hardDelete(@Param('id') id: string) {
+    return this.programmesService.hardDelete(id);
   }
 }

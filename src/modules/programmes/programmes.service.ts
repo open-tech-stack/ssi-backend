@@ -80,7 +80,6 @@ export class ProgrammesService {
     const programme = await this.repo.create(data, sections);
     this.logger.log(`Programme créé : ${programme.id} (${programme.title})`);
 
-    // 🔔 Notification UNIQUEMENT si le flag est activé
     if (dto.notification === true) {
       await this.notifications.notifyProgramme({
         id: programme.id,
@@ -103,6 +102,7 @@ export class ProgrammesService {
       status: query.status,
       q: query.q,
       period: query.period,
+      deleted: query.deleted,
       skip,
       take: query.pageSize,
     });
@@ -209,13 +209,43 @@ export class ProgrammesService {
   }
 
   // ------------------------------------------------------------------
-  // DELETE (soft)
+  // SOFT DELETE
   // ------------------------------------------------------------------
   async remove(id: string) {
     const existing = await this.repo.findById(id);
     if (!existing) throw new NotFoundException(`Programme ${id} introuvable.`);
 
     await this.repo.softDelete(id);
+    this.logger.log(`Programme soft-deleted : ${id}`);
+    return { success: true };
+  }
+
+  // ------------------------------------------------------------------
+  // RESTORE
+  // ------------------------------------------------------------------
+  async restore(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Programme ${id} introuvable.`);
+    if (!existing.deletedAt) {
+      throw new BadRequestException(
+        'Ce programme n\'est pas supprimé, impossible de le restaurer.',
+      );
+    }
+
+    const restored = await this.repo.restore(id);
+    this.logger.log(`Programme restauré : ${id}`);
+    return ProgrammeMapper.toResponse(restored);
+  }
+
+  // ------------------------------------------------------------------
+  // HARD DELETE — définitif
+  // ------------------------------------------------------------------
+  async hardDelete(id: string) {
+    const existing = await this.repo.findByIdAny(id);
+    if (!existing) throw new NotFoundException(`Programme ${id} introuvable.`);
+
+    await this.repo.hardDelete(id);
+    this.logger.warn(`Programme SUPPRIMÉ DÉFINITIVEMENT : ${id}`);
     return { success: true };
   }
 }

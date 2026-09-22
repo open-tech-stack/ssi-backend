@@ -40,9 +40,7 @@ export class ProgrammeMapper {
         id: sp.person.id,
         fullName: sp.person.fullName,
       })),
-      group: s.group
-        ? { id: s.group.id, name: s.group.name }
-        : null,
+      group: s.group ? { id: s.group.id, name: s.group.name } : null,
     }));
 
     const computedStatus = computeStatus(p);
@@ -68,6 +66,8 @@ export class ProgrammeMapper {
       sections,
       createdAt: p.createdAt.toISOString(),
       updatedAt: p.updatedAt.toISOString(),
+      deletedAt: p.deletedAt?.toISOString() ?? null,
+      isDeleted: p.deletedAt !== null,
     };
   }
 
